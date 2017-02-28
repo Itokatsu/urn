@@ -3,7 +3,11 @@
 #include <string.h>
 #include <time.h>
 #include <jansson.h>
+#include <libgen.h>
 #include "urn.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 long long urn_time_now(void) {
     struct timespec timespec;
@@ -392,6 +396,32 @@ int urn_game_save(const urn_game *game) {
     if (!json_dump_file(json, game->path,
                         JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
         error = 1;
+    }
+    size_t len = strlen(game->path);
+    char *copy = malloc(len+1);
+    char *bname = malloc(20);
+    char fullpath[100];
+    char dname[100];
+    if (len >= 5) {
+        strncpy(dname, game->path, len-5);
+        strcpy(copy, game->path);
+        bname = basename(copy);
+        size_t blen = strlen(bname);
+        bname[blen-5] = 0;
+    }
+    if (copy) {
+        struct stat st = {0};
+        if (stat(copy, &st) == -1) {
+            mkdir(copy, 0700);
+        }
+        printf("%d\n",strlen(fullpath));
+        printf("%s/%s-%d.json\n", copy, bname, game->attempt_count);
+        snprintf(fullpath, sizeof fullpath, "%s/%s-%d.json",
+                 dname, bname, game->attempt_count );
+        if (!json_dump_file(json, fullpath,
+                            JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
+            error = 1;
+        }
     }
     json_decref(json);
     return error;
