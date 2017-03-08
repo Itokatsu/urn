@@ -422,7 +422,7 @@ int urn_timer_store(const urn_timer *timer) {
     else {
         int i;
         for (i = 0; i < timer->game->split_count; ++i) {
-            if (timer->segment_deltas == 0 && timer->split_deltas == 0) {
+            if (timer->segment_deltas[i] == 0 && timer->split_deltas[i] == 0) {
                 fprintf(fp, "-, ");
             }
             else {
