@@ -421,7 +421,7 @@ int urn_timer_store(const urn_timer *timer) {
     }
     else {
         int i;
-        for (i = 0; i < timer->game->split_count; ++i) {
+        for (i = 0; i < timer->curr_split; ++i) {
             if (timer->segment_deltas[i] == 0 && timer->split_deltas[i] == 0) {
                 fprintf(fp, "-, ");
             }
@@ -430,6 +430,9 @@ int urn_timer_store(const urn_timer *timer) {
                 urn_time_string_serialized(segtime_str, timer->segment_times[i]);
                 fprintf(fp, "%s, ", segtime_str);
             }
+        }
+        for (i; i < timer->game->split_count; ++i) {
+            fprintf(fp, "-, ");
         }
         fprintf(fp, "\n");
         fclose(fp);
