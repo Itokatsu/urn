@@ -397,35 +397,36 @@ int urn_game_save(const urn_game *game) {
                         JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
         error = 1;
     }
+    json_decref(json);
+    return error;
+}
+
+/*void game_store(const urn_game *game) {
     size_t len = strlen(game->path);
     char *copy = malloc(len+1);
     char *bname = malloc(20);
     char fullpath[100];
     char dname[100];
-    if (len >= 5) {
-        strncpy(dname, game->path, len-5);
+    if (len >= 5 && copy && bname) {
         strcpy(copy, game->path);
+        strncpy(dname, game->path, len-5);
         bname = basename(copy);
         size_t blen = strlen(bname);
         bname[blen-5] = 0;
-    }
-    if (copy) {
-        struct stat st = {0};
-        if (stat(copy, &st) == -1) {
-            mkdir(copy, 0700);
-        }
-        printf("%d\n",strlen(fullpath));
-        printf("%s/%s-%d.json\n", copy, bname, game->attempt_count);
-        snprintf(fullpath, sizeof fullpath, "%s/%s-%d.json",
-                 dname, bname, game->attempt_count );
-        if (!json_dump_file(json, fullpath,
-                            JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
-            error = 1;
+        if (copy && bname) {
+            struct stat st = {0};
+            if (stat(copy, &st) == -1) {
+                mkdir(copy, 0700);
+            }
+            snprintf(fullpath, sizeof fullpath, "%s/%s-%d.json",
+                     dname, bname, game->attempt_count );
+            if (!json_dump_file(json, fullpath,
+                                JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
+                error = 1;
+            }
         }
     }
-    json_decref(json);
-    return error;
-}
+}*/
 
 void urn_timer_release(urn_timer *timer) {
     if (timer->split_times) {
@@ -528,7 +529,7 @@ int urn_timer_create(urn_timer **timer_ptr, urn_game *game) {
         error = 1;
         goto timer_create_done;
     }
-    timer->split_info = calloc(timer->game->split_count,
+   timer->split_info = calloc(timer->game->split_count,
                                sizeof(int));
     if (!timer->split_info) {
         error = 1;
@@ -626,7 +627,7 @@ int urn_timer_split(urn_timer *timer) {
             if (!timer->best_segments[timer->curr_split]
                 || timer->segment_times[timer->curr_split]
                 < timer->best_segments[timer->curr_split]) {
-                timer->best_segments[timer->curr_split] =
+               timer->best_segments[timer->curr_split] =
                     timer->segment_times[timer->curr_split];
                 timer->split_info[timer->curr_split]
                     |= URN_INFO_BEST_SEGMENT;
@@ -674,9 +675,25 @@ int urn_timer_unsplit(urn_timer *timer) {
         for (i = curr; i < timer->game->split_count; ++i) {
             timer->split_times[i] = timer->game->split_times[i];
             timer->split_deltas[i] = 0;
-            timer->split_info[i] = 0;
             timer->segment_times[i] = timer->game->segment_times[i];
             timer->segment_deltas[i] = 0;
+            timer->split_info[i] = 0;
+            //undo best splits
+            timer->best_splits[i] = timer->game->best_splits[i];
+            //undo best segments
+            timer->best_segments[i] = timer->game->best_segments[i];
+            // update sum of bests
+            timer->sum_of_bests = 0;
+            for (i = 0; i < timer->game->split_count; ++i) {
+                if (timer->best_segments[i]) {
+                    timer->sum_of_bests += timer->best_segments[i];
+                } else if (timer->game->best_segments[i]) {
+                    timer->sum_of_bests += timer->game->best_segments[i];
+                } else {
+                    timer->sum_of_bests = 0;
+                    break;
+                }
+            }
         }
         if (timer->curr_split + 1 == timer->game->split_count) {
             timer->running = 1;
