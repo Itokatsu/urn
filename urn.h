@@ -88,4 +88,7 @@ int urn_timer_reset(urn_timer *timer);
 
 int urn_timer_cancel(urn_timer *timer);
 
+int urn_timer_store(const urn_timer *timer);
+
 #endif
+

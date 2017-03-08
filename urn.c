@@ -401,32 +401,41 @@ int urn_game_save(const urn_game *game) {
     return error;
 }
 
-/*void game_store(const urn_game *game) {
-    size_t len = strlen(game->path);
-    char *copy = malloc(len+1);
-    char *bname = malloc(20);
-    char fullpath[100];
-    char dname[100];
-    if (len >= 5 && copy && bname) {
-        strcpy(copy, game->path);
-        strncpy(dname, game->path, len-5);
-        bname = basename(copy);
-        size_t blen = strlen(bname);
-        bname[blen-5] = 0;
-        if (copy && bname) {
-            struct stat st = {0};
-            if (stat(copy, &st) == -1) {
-                mkdir(copy, 0700);
+int urn_timer_store(const urn_timer *timer) {
+    if (timer->curr_split == 0) {
+        /* No splits to save */
+        return 0;
+    }
+    int error = 0;
+    char *statfile = strdup(timer->game->path);
+    char *extn = NULL;
+    extn = strstr(statfile, ".json");
+    if (extn != NULL) {
+        *extn = '\0';
+    }
+    strcat(statfile, ".stat");
+
+    FILE* fp = fopen(statfile, "a");
+    if (!fp) {
+        error = 1;
+    }
+    else {
+        int i;
+        for (i = 0; i < timer->game->split_count; ++i) {
+            if (timer->segment_deltas == 0 && timer->split_deltas == 0) {
+                fprintf(fp, "-, ");
             }
-            snprintf(fullpath, sizeof fullpath, "%s/%s-%d.json",
-                     dname, bname, game->attempt_count );
-            if (!json_dump_file(json, fullpath,
-                                JSON_PRESERVE_ORDER | JSON_INDENT(2))) {
-                error = 1;
+            else {
+                char segtime_str[256];
+                urn_time_string_serialized(segtime_str, timer->segment_times[i]);
+                fprintf(fp, "%s, ", segtime_str);
             }
         }
+        fprintf(fp, "\n");
+        fclose(fp);
     }
-}*/
+    return error;
+}
 
 void urn_timer_release(urn_timer *timer) {
     if (timer->split_times) {
@@ -453,6 +462,7 @@ void urn_timer_release(urn_timer *timer) {
 }
 
 static void reset_timer(urn_timer *timer) {
+    urn_timer_store(timer);
     int i;
     int size;
     timer->started = 0;
