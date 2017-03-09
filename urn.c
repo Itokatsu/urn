@@ -166,11 +166,13 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
         goto game_create_done;
     }
     // copy path to file
+    game->path = NULL;
     game->path = strdup(path);
     if (!game->path) {
         error = 1;
         goto game_create_done;
     }
+
     // load json
     json = json_load_file(game->path, 0, &json_error);
     if (!json) {
@@ -406,29 +408,37 @@ int urn_timer_store(const urn_timer *timer) {
         /* No splits to save */
         return 0;
     }
-    int error = 0;
-    char *statfile = strdup(timer->game->path);
+    // generate stat file path
+    char *stpath = strdup(timer->game->path);
     char *extn = NULL;
-    extn = strstr(statfile, ".json");
+    extn = strstr(stpath, ".json");
     if (extn != NULL) {
         *extn = '\0';
     }
-    strcat(statfile, ".stat");
+    strcat(stpath, ".stat");
+    printf(stpath);
 
-    FILE* fp = fopen(statfile, "a");
+    int error = 0;
+    FILE* fp = fopen(stpath, "a");
     if (!fp) {
         error = 1;
     }
     else {
+        time_t rawtime = time(NULL);
+        struct tm *loctime = localtime(&rawtime);
+        fprintf(fp, "%d-%02d-%02d", loctime->tm_year + 1900,
+                loctime->tm_mon + 1, loctime->tm_mday);
         int i;
         for (i = 0; i < timer->game->split_count; ++i) {
-            if (timer->segment_deltas[i] == 0 && timer->split_deltas[i] == 0) {
-                fprintf(fp, "-, ");
+            if (timer->segment_times[i]) {
+                // human readable
+                /* char segtime_str[256];
+                urn_time_string_serialized(segtime_str, timer->segment_times[i]);
+                fprintf(fp, ",%s", segtime_str);*/
+                fprintf(fp, ",%d", timer->segment_times[i]);
             }
             else {
-                char segtime_str[256];
-                urn_time_string_serialized(segtime_str, timer->segment_times[i]);
-                fprintf(fp, "%s, ", segtime_str);
+                fprintf(fp, ",-");
             }
         }
         fprintf(fp, "\n");
