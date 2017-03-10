@@ -45,8 +45,8 @@ struct urn_timer {
     int *split_info;
     long long *best_splits;
     long long *best_segments;
-    int *split_ptile;
-    int *segment_ptile;
+    int *split_ptiles;
+    int *segment_ptiles;
     const urn_game *game;
     int *attempt_count;
 };

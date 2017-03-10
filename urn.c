@@ -529,8 +529,8 @@ void urn_timer_release(urn_timer *timer) {
     if (timer->split_deltas) {
         free(timer->split_deltas);
     }
-    if (timer->split_ptile) {
-        free(timer->split_ptile);
+    if (timer->split_ptiles) {
+        free(timer->split_ptiles);
     }
     if (timer->segment_times) {
         free(timer->segment_times);
@@ -538,8 +538,8 @@ void urn_timer_release(urn_timer *timer) {
     if (timer->segment_deltas) {
         free(timer->segment_deltas);
     }
-    if (timer->segment_ptile) {
-        free(timer->segment_ptile);
+    if (timer->segment_ptiles) {
+        free(timer->segment_ptiles);
     }
     if (timer->split_info) {
         free(timer->split_info);
@@ -569,8 +569,8 @@ static void reset_timer(urn_timer *timer) {
     memcpy(timer->best_segments, timer->game->best_segments, size);
     size = timer->game->split_count * sizeof(int);
     memset(timer->split_info, 0, size);
-    memset(timer->split_ptile, 0, size);
-    memset(timer->segment_ptile, 0, size);
+    memset(timer->split_ptiles, 0, size);
+    memset(timer->segment_ptiles, 0, size);
     timer->sum_of_bests = 0;
     for (i = 0; i < timer->game->split_count; ++i) {
         if (timer->best_segments[i]) {
@@ -638,15 +638,15 @@ int urn_timer_create(urn_timer **timer_ptr, urn_game *game) {
         error = 1;
         goto timer_create_done;
     }
-    timer->segment_ptile = calloc(timer->game->split_count,
+    timer->segment_ptiles = calloc(timer->game->split_count,
                                 sizeof(int));
-    if (!timer->segment_ptile) {
+    if (!timer->segment_ptiles) {
         error = 1;
         goto timer_create_done;
     }
-    timer->split_ptile = calloc(timer->game->split_count,
+    timer->split_ptiles = calloc(timer->game->split_count,
                                 sizeof(int));
-    if (!timer->split_ptile) {
+    if (!timer->split_ptiles) {
         error = 1;
         goto timer_create_done;
     }
@@ -790,11 +790,8 @@ int urn_timer_split(urn_timer *timer) {
             }
             sp_ptile = 100*(sp_p) / (timer->game->data_size+1-sp_z);
             seg_ptile = 100*(seg_p) / (timer->game->data_size+1-seg_z);
-            timer->split_ptile[timer->curr_split] = (int) sp_ptile;
-            timer->segment_ptile[timer->curr_split] = (int) seg_ptile;
-            printf("seg is P(%d); split is P(%d)\n",
-                    timer->segment_ptile[timer->curr_split],
-                    timer->split_ptile[timer->curr_split]);
+            timer->split_ptiles[timer->curr_split] = (int) sp_ptile;
+            timer->segment_ptiles[timer->curr_split] = (int) seg_ptile;
 
             // stop timer if last split
             if (timer->curr_split + 1 == timer->game->split_count) {
@@ -811,11 +808,11 @@ int urn_timer_skip(urn_timer *timer) {
         if (timer->curr_split < timer->game->split_count) {
             timer->split_times[timer->curr_split] = 0;
             timer->split_deltas[timer->curr_split] = 0;
-            timer->split_ptile[timer->curr_split] = 0;
+            timer->split_ptiles[timer->curr_split] = 0;
             timer->split_info[timer->curr_split] = 0;
             timer->segment_times[timer->curr_split] = 0;
             timer->segment_deltas[timer->curr_split] = 0;
-            timer->segment_ptile[timer->curr_split] = 0;
+            timer->segment_ptiles[timer->curr_split] = 0;
             return ++timer->curr_split;
         }
     }
@@ -829,10 +826,10 @@ int urn_timer_unsplit(urn_timer *timer) {
         for (i = curr; i < timer->game->split_count; ++i) {
             timer->split_times[i] = timer->game->split_times[i];
             timer->split_deltas[i] = 0;
-            timer->split_ptile[i] = 0;
+            timer->split_ptiles[i] = 0;
             timer->segment_times[i] = timer->game->segment_times[i];
             timer->segment_deltas[i] = 0;
-            timer->segment_ptile[i] = 0;
+            timer->segment_ptiles[i] = 0;
             timer->split_info[i] = 0;
             //undo best splits
             timer->best_splits[i] = timer->game->best_splits[i];
