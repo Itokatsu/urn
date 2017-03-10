@@ -116,6 +116,24 @@ void urn_delta_string(char *string, long long time) {
     urn_time_string_format(string, NULL, time, 0, 1, 1);
 }
 
+void numtoord(char* string, int num) {
+    if (11 <= num && num <= 13) {
+        snprintf(string, sizeof(string), "%dth", num);
+    }
+    else if (num % 10 == 1) {
+        snprintf(string, sizeof(string), "%dst", num);
+    }
+    else if (num % 10 == 2) {
+        snprintf(string, sizeof(string), "%dnd", num);
+    }
+    else if (num % 10 == 3) {
+        snprintf(string, sizeof(string), "%drd", num);
+    }
+    else {
+        snprintf(string, sizeof(string), "%dth", num);
+    }
+}
+
 void urn_game_release(urn_game *game) {
     int i;
     if (game->path) {
@@ -159,6 +177,7 @@ void urn_game_release(urn_game *game) {
                 free(game->segment_data[i]);
             }
         }
+        free(game->segment_data);
     }
     if (game->split_data) {
         for (i = 0; i < game->split_count; ++i) {
@@ -166,6 +185,64 @@ void urn_game_release(urn_game *game) {
                 free(game->split_data[i]);
             }
         }
+        free(game->split_data);
+    }
+}
+int cmp (const void *a, const void *b) {
+    return ( *(long long*)a - *(long long*)b);
+}
+void urn_game_load_data(urn_game *game) {
+    int c, i;
+    // populate data
+    FILE *datafp = fopen(game->datapath, "r");
+    if (datafp) {
+        while ((c = getc(datafp)) != EOF) {
+            if (c == '\n') {
+                game->data_size++;
+            }
+        }
+        game->split_data = calloc(game->split_count, sizeof(long long*));
+        game->segment_data = calloc(game->split_count, sizeof(long long*));
+        for (int i=0; i<game->split_count; ++i) {
+            if(game->split_data[i]) {
+                free(game->split_data[i]);
+            }
+            if(game->segment_data[i]) {
+                free(game->segment_data[i]);
+            }
+            game->split_data[i] = calloc(game->data_size, sizeof(long long));
+            game->segment_data[i] = calloc(game->data_size, sizeof(long long));
+        }
+        rewind(datafp);
+        int col = -1; //first is date
+        int row = 0;
+        char buffer[(game->split_count+2) * sizeof(long long)];
+        while (fgets(buffer, sizeof(buffer), datafp) != NULL ) {
+            char *token = strtok(buffer, ",");
+            while (token) {
+                if (col >= 0 && *token != '\n') {
+                    game->split_data[col][row] = atoll(token);
+                    if (col == 0) {
+                        game->segment_data[col][row] = game->split_data[col][row];
+                    } else if (game->split_data[col][row] == 0 || game->split_data[col-1][row] == 0) {
+                        game->segment_data[col][row] = 0;
+                    }
+                    else {
+                        game->segment_data[col][row] = game->split_data[col][row] - game->split_data[col-1][row];
+                    }
+                }
+                col++;
+                token = strtok(NULL, ",");
+            }
+            col = -1;
+            row++;
+        }
+        fclose(datafp);
+    }
+
+    for (i=0; i<game->split_count; ++i) {
+        qsort(game->split_data[i], game->data_size, sizeof(long long), cmp);
+        qsort(game->segment_data[i], game->data_size, sizeof(long long), cmp);
     }
 }
 
@@ -338,8 +415,22 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
             }
         }
     }
-    // populate data
+
     FILE *datafp = fopen(game->datapath, "r");
+    if (datafp) {
+        int c;
+        while ((c = getc(datafp)) != EOF) {
+            if (c == '\n') {
+                game->data_size++;
+            }
+        }
+
+        fclose(datafp);
+        urn_game_load_data(game);
+    }
+
+    // populate data
+   /* FILE *datafp = fopen(game->datapath, "r");
     if (datafp) {
         int c;
         while ((c = getc(datafp)) != EOF) {
@@ -392,7 +483,7 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
             qsort(game->split_data[i], game->data_size, sizeof(long long), cmp);
             qsort(game->segment_data[i], game->data_size, sizeof(long long), cmp);
         }
-    }
+    }*/
 
 game_create_done:
     if (!error) {
@@ -554,6 +645,7 @@ void urn_timer_release(urn_timer *timer) {
 
 static void reset_timer(urn_timer *timer) {
     urn_timer_store(timer);
+    urn_game_load_data(timer->game);
     int i;
     int size;
     timer->started = 0;

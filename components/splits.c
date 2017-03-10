@@ -263,9 +263,12 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
         }
         gtk_label_set_text(GTK_LABEL(self->split_ptiles[i]), "");
         if (i < timer->curr_split) {
+            char tmp_sp[16];
+            char tmp_seg[16];
+            numtoord(tmp_sp, timer->split_ptiles[i]);
+            numtoord(tmp_seg, timer->segment_ptiles[i]);
             add_class(self->split_ptiles[i], "ptile");
-            snprintf(str, sizeof(str), "  %dth\n(%dth)", timer->split_ptiles[i],
-                                timer->segment_ptiles[i]);
+            snprintf(str, sizeof(str), "  %s\n(%s)", tmp_sp, tmp_seg);
             gtk_label_set_text(GTK_LABEL(self->split_ptiles[i]), str);
         }
     }

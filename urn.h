@@ -64,6 +64,8 @@ void urn_split_string(char *string, long long time);
 
 void urn_delta_string(char *string, long long time);
 
+void numtoord(char *string, int num);
+
 int urn_game_create(urn_game **game_ptr, const char *path);
 
 void urn_game_update_splits(urn_game *game, const urn_timer *timer);
@@ -73,6 +75,8 @@ void urn_game_update_bests(urn_game *game, const urn_timer *timer);
 int urn_game_save(const urn_game *game);
 
 void urn_game_release(urn_game *game);
+
+void urn_game_load_data(urn_game *game);
 
 int urn_timer_create(urn_timer **timer_ptr, urn_game *game);
 
