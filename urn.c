@@ -428,63 +428,6 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
         fclose(datafp);
         urn_game_load_data(game);
     }
-
-    // populate data
-   /* FILE *datafp = fopen(game->datapath, "r");
-    if (datafp) {
-        int c;
-        while ((c = getc(datafp)) != EOF) {
-            if (c == '\n') {
-                game->data_size++;
-            }
-        }
-
-        long long **spdata = calloc(game->split_count, sizeof(long long*));
-        long long **segdata = calloc(game->split_count, sizeof(long long*));
-        game->split_data = spdata;
-        game->segment_data = segdata;
-
-        for (i=0; i<game->split_count; ++i) {
-            spdata[i] = calloc(game->data_size, sizeof(long long));
-            segdata[i] = calloc(game->data_size, sizeof(long long));
-            game->split_data[i] = spdata[i];
-            game->segment_data[i] = segdata[i];
-        }
-
-        rewind(datafp);
-        int col = -1;
-        int row = 0;
-        char buffer[(game->split_count+2) * sizeof(long long)];
-        while (fgets(buffer, sizeof(buffer), datafp) != NULL ) {
-            char *token = strtok(buffer, ",");
-            while (token) {
-                if (col >= 0 && *token != '\n') {
-                    spdata[col][row] = atoll(token);
-                    if (col == 0) {
-                        segdata[col][row] = spdata[col][row];
-                    } else if (spdata[col][row] == 0 || spdata[col-1][row] == 0) {
-                        segdata[col][row] = 0;
-                    }
-                    else {
-                        segdata[col][row] = spdata[col][row] - spdata[col-1][row];
-                    }
-                }
-                col++;
-                token = strtok(NULL, ",");
-            }
-            col = -1;
-            row++;
-        }
-
-        int cmp (const void *a, const void *b) {
-            return ( *(long long*)a - *(long long*)b);
-        }
-        for (i=0; i<game->split_count; ++i) {
-            qsort(game->split_data[i], game->data_size, sizeof(long long), cmp);
-            qsort(game->segment_data[i], game->data_size, sizeof(long long), cmp);
-        }
-    }*/
-
 game_create_done:
     if (!error) {
         *game_ptr = game;
