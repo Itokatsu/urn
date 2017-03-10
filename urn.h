@@ -22,6 +22,10 @@ struct urn_game {
     long long *segment_times;
     long long *best_splits;
     long long *best_segments;
+    char *datapath;
+    int data_size;
+    long long **split_data;
+    long long **segment_data;
 };
 typedef struct urn_game urn_game;
 
@@ -41,8 +45,10 @@ struct urn_timer {
     int *split_info;
     long long *best_splits;
     long long *best_segments;
+    int *split_ptiles;
+    int *segment_ptiles;
     const urn_game *game;
-  int *attempt_count;
+    int *attempt_count;
 };
 typedef struct urn_timer urn_timer;
 
@@ -58,6 +64,8 @@ void urn_split_string(char *string, long long time);
 
 void urn_delta_string(char *string, long long time);
 
+void numtoord(char *string, int num);
+
 int urn_game_create(urn_game **game_ptr, const char *path);
 
 void urn_game_update_splits(urn_game *game, const urn_timer *timer);
@@ -67,6 +75,8 @@ void urn_game_update_bests(urn_game *game, const urn_timer *timer);
 int urn_game_save(const urn_game *game);
 
 void urn_game_release(urn_game *game);
+
+void urn_game_load_data(urn_game *game);
 
 int urn_timer_create(urn_timer **timer_ptr, urn_game *game);
 

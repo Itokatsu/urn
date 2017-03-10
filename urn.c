@@ -116,6 +116,24 @@ void urn_delta_string(char *string, long long time) {
     urn_time_string_format(string, NULL, time, 0, 1, 1);
 }
 
+void numtoord(char* string, int num) {
+    if (11 <= num && num <= 13) {
+        snprintf(string, sizeof(string), "%dth", num);
+    }
+    else if (num % 10 == 1) {
+        snprintf(string, sizeof(string), "%dst", num);
+    }
+    else if (num % 10 == 2) {
+        snprintf(string, sizeof(string), "%dnd", num);
+    }
+    else if (num % 10 == 3) {
+        snprintf(string, sizeof(string), "%drd", num);
+    }
+    else {
+        snprintf(string, sizeof(string), "%dth", num);
+    }
+}
+
 void urn_game_release(urn_game *game) {
     int i;
     if (game->path) {
@@ -150,6 +168,82 @@ void urn_game_release(urn_game *game) {
     if (game->best_segments) {
         free(game->best_segments);
     }
+    if (game->datapath) {
+        free(game->datapath);
+    }
+    if (game->segment_data) {
+        for (i = 0; i < game->split_count; ++i) {
+            if (game->segment_data[i]) {
+                free(game->segment_data[i]);
+            }
+        }
+        free(game->segment_data);
+    }
+    if (game->split_data) {
+        for (i = 0; i < game->split_count; ++i) {
+            if (game->split_data[i]) {
+                free(game->split_data[i]);
+            }
+        }
+        free(game->split_data);
+    }
+}
+int cmp (const void *a, const void *b) {
+    return ( *(long long*)a - *(long long*)b);
+}
+void urn_game_load_data(urn_game *game) {
+    int c, i;
+    // populate data
+    FILE *datafp = fopen(game->datapath, "r");
+    if (datafp) {
+        while ((c = getc(datafp)) != EOF) {
+            if (c == '\n') {
+                game->data_size++;
+            }
+        }
+        game->split_data = calloc(game->split_count, sizeof(long long*));
+        game->segment_data = calloc(game->split_count, sizeof(long long*));
+        for (int i=0; i<game->split_count; ++i) {
+            if(game->split_data[i]) {
+                free(game->split_data[i]);
+            }
+            if(game->segment_data[i]) {
+                free(game->segment_data[i]);
+            }
+            game->split_data[i] = calloc(game->data_size, sizeof(long long));
+            game->segment_data[i] = calloc(game->data_size, sizeof(long long));
+        }
+        rewind(datafp);
+        int col = -1; //first is date
+        int row = 0;
+        char buffer[(game->split_count+2) * sizeof(long long)];
+        while (fgets(buffer, sizeof(buffer), datafp) != NULL ) {
+            char *token = strtok(buffer, ",");
+            while (token) {
+                if (col >= 0 && *token != '\n') {
+                    game->split_data[col][row] = atoll(token);
+                    if (col == 0) {
+                        game->segment_data[col][row] = game->split_data[col][row];
+                    } else if (game->split_data[col][row] == 0 || game->split_data[col-1][row] == 0) {
+                        game->segment_data[col][row] = 0;
+                    }
+                    else {
+                        game->segment_data[col][row] = game->split_data[col][row] - game->split_data[col-1][row];
+                    }
+                }
+                col++;
+                token = strtok(NULL, ",");
+            }
+            col = -1;
+            row++;
+        }
+        fclose(datafp);
+    }
+
+    for (i=0; i<game->split_count; ++i) {
+        qsort(game->split_data[i], game->data_size, sizeof(long long), cmp);
+        qsort(game->segment_data[i], game->data_size, sizeof(long long), cmp);
+    }
 }
 
 int urn_game_create(urn_game **game_ptr, const char *path) {
@@ -166,8 +260,22 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
         goto game_create_done;
     }
     // copy path to file
+    game->data_size = 0;
+    game->path = NULL;
     game->path = strdup(path);
     if (!game->path) {
+        error = 1;
+        goto game_create_done;
+    }
+    // generate stat file path
+    game->datapath = strdup(path);
+    char *extn = NULL;
+    extn = strstr(game->datapath, ".json");
+    if (extn != NULL) {
+        *extn = '\0';
+    }
+    strcat(game->datapath, ".stat");
+    if (!game->datapath) {
         error = 1;
         goto game_create_done;
     }
@@ -307,7 +415,20 @@ int urn_game_create(urn_game **game_ptr, const char *path) {
             }
         }
     }
- game_create_done:
+
+    FILE *datafp = fopen(game->datapath, "r");
+    if (datafp) {
+        int c;
+        while ((c = getc(datafp)) != EOF) {
+            if (c == '\n') {
+                game->data_size++;
+            }
+        }
+
+        fclose(datafp);
+        urn_game_load_data(game);
+    }
+game_create_done:
     if (!error) {
         *game_ptr = game;
     } else if (game) {
@@ -407,28 +528,26 @@ int urn_timer_store(const urn_timer *timer) {
         return 0;
     }
     int error = 0;
-    char *statfile = strdup(timer->game->path);
-    char *extn = NULL;
-    extn = strstr(statfile, ".json");
-    if (extn != NULL) {
-        *extn = '\0';
-    }
-    strcat(statfile, ".stat");
-
-    FILE* fp = fopen(statfile, "a");
+    FILE* fp = fopen(timer->game->datapath, "a");
     if (!fp) {
         error = 1;
     }
     else {
+        time_t rawtime = time(NULL);
+        struct tm *loctime = localtime(&rawtime);
+        fprintf(fp, "%d-%02d-%02d", loctime->tm_year + 1900,
+                loctime->tm_mon + 1, loctime->tm_mday);
         int i;
-        for (i = 0; i < timer->curr_split; ++i) {
-            if (timer->segment_deltas[i] == 0 && timer->split_deltas[i] == 0) {
-                fprintf(fp, "-, ");
+        for (i = 0; i < timer->game->split_count; ++i) {
+            if (timer->split_times[i]) {
+                // human readable
+                /* char segtime_str[256];
+                urn_time_string_serialized(segtime_str, timer->segment_times[i]);
+                fprintf(fp, ",%s", segtime_str);*/
+                fprintf(fp, ",%d", timer->split_times[i]);
             }
             else {
-                char segtime_str[256];
-                urn_time_string_serialized(segtime_str, timer->segment_times[i]);
-                fprintf(fp, "%s, ", segtime_str);
+                fprintf(fp, ",-");
             }
         }
         for (i; i < timer->game->split_count; ++i) {
@@ -447,11 +566,17 @@ void urn_timer_release(urn_timer *timer) {
     if (timer->split_deltas) {
         free(timer->split_deltas);
     }
+    if (timer->split_ptiles) {
+        free(timer->split_ptiles);
+    }
     if (timer->segment_times) {
         free(timer->segment_times);
     }
     if (timer->segment_deltas) {
         free(timer->segment_deltas);
+    }
+    if (timer->segment_ptiles) {
+        free(timer->segment_ptiles);
     }
     if (timer->split_info) {
         free(timer->split_info);
@@ -466,6 +591,7 @@ void urn_timer_release(urn_timer *timer) {
 
 static void reset_timer(urn_timer *timer) {
     urn_timer_store(timer);
+    urn_game_load_data(timer->game);
     int i;
     int size;
     timer->started = 0;
@@ -481,6 +607,8 @@ static void reset_timer(urn_timer *timer) {
     memcpy(timer->best_segments, timer->game->best_segments, size);
     size = timer->game->split_count * sizeof(int);
     memset(timer->split_info, 0, size);
+    memset(timer->split_ptiles, 0, size);
+    memset(timer->segment_ptiles, 0, size);
     timer->sum_of_bests = 0;
     for (i = 0; i < timer->game->split_count; ++i) {
         if (timer->best_segments[i]) {
@@ -545,6 +673,18 @@ int urn_timer_create(urn_timer **timer_ptr, urn_game *game) {
    timer->split_info = calloc(timer->game->split_count,
                                sizeof(int));
     if (!timer->split_info) {
+        error = 1;
+        goto timer_create_done;
+    }
+    timer->segment_ptiles = calloc(timer->game->split_count,
+                                sizeof(int));
+    if (!timer->segment_ptiles) {
+        error = 1;
+        goto timer_create_done;
+    }
+    timer->split_ptiles = calloc(timer->game->split_count,
+                                sizeof(int));
+    if (!timer->split_ptiles) {
         error = 1;
         goto timer_create_done;
     }
@@ -657,6 +797,40 @@ int urn_timer_split(urn_timer *timer) {
                     break;
                 }
             }
+            // calculate percentiles ! @TODO
+            int sp_flag = 0, seg_flag = 0;
+            int sp_p = timer->game->data_size, seg_p = timer->game->data_size;
+            int sp_z = 0, seg_z = 0;
+            float sp_ptile, seg_ptile;
+            i = 0;
+            while (i < timer->game->data_size && !sp_flag && !seg_flag) {
+                //split idx
+                if (!sp_flag && timer->game->split_data[timer->curr_split][i]
+                    < timer->split_times[timer->curr_split]) {
+                        sp_p--;
+                        if (timer->game->split_data[timer->curr_split][i] == 0) {
+                            sp_z++;
+                        }
+                } else {
+                    sp_flag = 1;
+                }
+                //seg idx
+                if (!seg_flag && timer->game->segment_data[timer->curr_split][i]
+                    < timer->segment_times[timer->curr_split]) {
+                        seg_p--;
+                        if (timer->game->segment_data[timer->curr_split][i] == 0) {
+                            seg_z++;
+                        }
+                } else {
+                    seg_flag = 1;
+                }
+                i++;
+            }
+            sp_ptile = 100*(sp_p) / (timer->game->data_size+1-sp_z);
+            seg_ptile = 100*(seg_p) / (timer->game->data_size+1-seg_z);
+            timer->split_ptiles[timer->curr_split] = (int) sp_ptile;
+            timer->segment_ptiles[timer->curr_split] = (int) seg_ptile;
+
             // stop timer if last split
             if (timer->curr_split + 1 == timer->game->split_count) {
                 urn_timer_stop(timer);
@@ -672,9 +846,11 @@ int urn_timer_skip(urn_timer *timer) {
         if (timer->curr_split < timer->game->split_count) {
             timer->split_times[timer->curr_split] = 0;
             timer->split_deltas[timer->curr_split] = 0;
+            timer->split_ptiles[timer->curr_split] = 0;
             timer->split_info[timer->curr_split] = 0;
             timer->segment_times[timer->curr_split] = 0;
             timer->segment_deltas[timer->curr_split] = 0;
+            timer->segment_ptiles[timer->curr_split] = 0;
             return ++timer->curr_split;
         }
     }
@@ -688,8 +864,10 @@ int urn_timer_unsplit(urn_timer *timer) {
         for (i = curr; i < timer->game->split_count; ++i) {
             timer->split_times[i] = timer->game->split_times[i];
             timer->split_deltas[i] = 0;
+            timer->split_ptiles[i] = 0;
             timer->segment_times[i] = timer->game->segment_times[i];
             timer->segment_deltas[i] = 0;
+            timer->segment_ptiles[i] = 0;
             timer->split_info[i] = 0;
             //undo best splits
             timer->best_splits[i] = timer->game->best_splits[i];

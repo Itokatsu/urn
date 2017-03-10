@@ -13,6 +13,7 @@ typedef struct _UrnSplits {
     GtkWidget **split_titles;
     GtkWidget **split_deltas;
     GtkWidget **split_times;
+    GtkWidget **split_ptiles;
 } UrnSplits;
 extern UrnComponentOps urn_splits_operations;
 
@@ -40,7 +41,7 @@ UrnComponent *urn_component_splits_new() {
                 GTK_SCROLLED_WINDOW(self->split_scroller))),
         GTK_STATE_NORMAL,
         &color);
-    
+
     self->split_viewport = gtk_viewport_new(NULL, NULL);
     gtk_container_add(GTK_CONTAINER(self->split_scroller),
             self->split_viewport);
@@ -51,7 +52,7 @@ UrnComponent *urn_component_splits_new() {
     gtk_widget_set_hexpand(self->splits, TRUE);
     gtk_container_add(GTK_CONTAINER(self->split_viewport), self->splits);
     gtk_widget_show(self->splits);
-    
+
     self->split_last = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     add_class(self->split_last, "split-last");
     gtk_widget_set_hexpand(self->split_last, TRUE);
@@ -117,6 +118,8 @@ static void splits_show_game(UrnComponent *self_, urn_game *game,
     self->split_titles = calloc(self->split_count, sizeof(GtkWidget *));
     self->split_deltas = calloc(self->split_count, sizeof(GtkWidget *));
     self->split_times = calloc(self->split_count, sizeof(GtkWidget *));
+    self->split_ptiles = calloc(self->split_count, sizeof(GtkWidget *));
+
 
     for (i = 0; i < self->split_count; ++i) {
         self->split_rows[i] = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -124,7 +127,7 @@ static void splits_show_game(UrnComponent *self_, urn_game *game,
         gtk_widget_set_hexpand(self->split_rows[i], TRUE);
         gtk_container_add(GTK_CONTAINER(self->splits),
                           self->split_rows[i]);
-        
+
         self->split_titles[i] = gtk_label_new(game->split_titles[i]);
         add_class(self->split_titles[i], "split-title");
         gtk_widget_set_halign(self->split_titles[i], GTK_ALIGN_START);
@@ -143,6 +146,13 @@ static void splits_show_game(UrnComponent *self_, urn_game *game,
         gtk_widget_set_halign(self->split_times[i], GTK_ALIGN_END);
         gtk_container_add(GTK_CONTAINER(self->split_rows[i]),
                           self->split_times[i]);
+
+        self->split_ptiles[i] = gtk_label_new(NULL);
+        add_class(self->split_times[i], "split-ptile");
+        gtk_widget_set_halign(self->split_times[i], GTK_ALIGN_END);
+        gtk_container_add(GTK_CONTAINER(self->split_rows[i]),
+                          self->split_ptiles[i]);
+
 
         if (game->split_times[i]) {
             urn_split_string(str, game->split_times[i]);
@@ -201,7 +211,7 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
         } else {
             remove_class(self->split_rows[i], "current-split");
         }
-        
+
         remove_class(self->split_times[i], "time");
         remove_class(self->split_times[i], "done");
         gtk_label_set_text(GTK_LABEL(self->split_times[i]), "-");
@@ -217,7 +227,7 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
             urn_split_string(str, game->split_times[i]);
             gtk_label_set_text(GTK_LABEL(self->split_times[i]), str);
         }
-        
+
         remove_class(self->split_deltas[i], "best-split");
         remove_class(self->split_deltas[i], "best-segment");
         remove_class(self->split_deltas[i], "behind");
@@ -251,12 +261,22 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
                 gtk_label_set_text(GTK_LABEL(self->split_deltas[i]), str);
             }
         }
+        gtk_label_set_text(GTK_LABEL(self->split_ptiles[i]), "");
+        if (i < timer->curr_split) {
+            char tmp_sp[16];
+            char tmp_seg[16];
+            numtoord(tmp_sp, timer->split_ptiles[i]);
+            numtoord(tmp_seg, timer->segment_ptiles[i]);
+            add_class(self->split_ptiles[i], "ptile");
+            snprintf(str, sizeof(str), "  %s\n(%s)", tmp_sp, tmp_seg);
+            gtk_label_set_text(GTK_LABEL(self->split_ptiles[i]), str);
+        }
     }
 
     // keep split sizes in sync
     if (self->split_count) {
         int width;
-        int time_width = 0, delta_width = 0;
+        int time_width = 0, delta_width = 0, ptile_width = 0;
         for (i = 0; i < self->split_count; ++i) {
             width = gtk_widget_get_allocated_width(self->split_deltas[i]);
             if (width > delta_width) {
@@ -266,7 +286,12 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
             if (width > time_width) {
                 time_width = width;
             }
+            width = gtk_widget_get_allocated_width(self->split_ptiles[i]);
+            if (width > ptile_width) {
+                ptile_width = width;
+            }
         }
+
         for (i = 0; i < self->split_count; ++i) {
             if (delta_width) {
                 gtk_widget_set_size_request(
@@ -277,6 +302,11 @@ static void splits_draw(UrnComponent *self_, urn_game *game, urn_timer *timer) {
                     self->split_times[i]);
                 gtk_widget_set_margin_left(self->split_times[i],
                     /*WINDOW_PAD*/ 8 * 2 + (time_width - width));
+            }
+            if (ptile_width) {
+                width = gtk_widget_get_allocated_width(self->split_ptiles[i]);
+                gtk_widget_set_margin_left(self->split_ptiles[i],
+                        4 * 2 + (ptile_width - width));
             }
         }
     }
