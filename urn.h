@@ -22,6 +22,10 @@ struct urn_game {
     long long *segment_times;
     long long *best_splits;
     long long *best_segments;
+    char *datapath;
+    int data_size;
+    long long **split_data;
+    long long **segment_data;
 };
 typedef struct urn_game urn_game;
 
@@ -41,8 +45,10 @@ struct urn_timer {
     int *split_info;
     long long *best_splits;
     long long *best_segments;
+    int *split_ptile;
+    int *segment_ptile;
     const urn_game *game;
-  int *attempt_count;
+    int *attempt_count;
 };
 typedef struct urn_timer urn_timer;
 
