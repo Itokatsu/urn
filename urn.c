@@ -224,7 +224,7 @@ void urn_game_load_data(urn_game *game) {
         while (fgets(buffer, sizeof(buffer), datafp) != NULL ) {
             char *token = strtok(buffer, ",");
             while (token) {
-                if (col >= 0 && *token != '\n') {
+                if (col >= 0 && *token != '\n' && col < game->split_count) {
                     if(*token == '-') {
                         game->split_data[col][row] = 0;
                     }
